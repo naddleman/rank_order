@@ -7,5 +7,3 @@ ipython_config.py
 env/
 venv/
 ENV/
-*.xls
-*.xlsx
