@@ -1,6 +1,7 @@
 import os
 import numpy as np
 import pandas as pd
+from collections import defaultdict
 
 """.xls files are 8 cols by n ~= 100 rows.
     first col is just ['', 'RR', '', '', ...] and each other col is the ranking
@@ -45,6 +46,47 @@ def pairwise_winrates(df):
                 count_wins = (difference < 0).value_counts()[True]
                 winrates[(col_1, col_2)] = count_wins / nrows
     return winrates
-                
 
+def digraph_from_winrate_pairs(wr_dict):
+    """Takes a dict with pairs of items for keys and win rate as values
+       and produces a directed graph dictionary with keys being items
+       and values, lists of items "beaten by" said item."""
+    digraph = defaultdict(list)
+    items = set()
+    for k, v in wr_dict.items():
+        head, tail = k[0], k[1]
+        items += head
+        items += tail
+        if v > 0.5:
+            digraph[head].append(tail)
+    return digraph
+
+def detect_cycles(digraph):
+    """Performs a DFS on a digraph to detect cycles, returning a list of all
+       cycles. The input should be represented as a dict whose keys are nodes
+       and values are lists of nodes"""
+    continue
+
+def sigma(x):
+    """helper function for Elo calculation"""
+    return 1 / (1 + np.exp(-x))
+
+def elo_gradient_descent(wr_dict, n=5000):
+    """calculates Elo ratings for each item in a simulated tournament
+       where each player plays against the others."""
+    alpha = np.log(10) / 400
+    items = set()
+    elo_dict = {}
+    for k in wr_dict.keys():
+        items += {k[0], k[1]}
+        elo_dict[k[0]] = 
+
+                
+#def main():
+
+
+if __name__ == '__main__':
+    lis = valid_sin_xls_sheets()
+    df = concatenate_excel_sheets(lis)
+    pairs = pairwise_winrates(df)
 
