@@ -65,22 +65,46 @@ def detect_cycles(digraph):
     """Performs a DFS on a digraph to detect cycles, returning a list of all
        cycles. The input should be represented as a dict whose keys are nodes
        and values are lists of nodes"""
-    continue
+    pass
 
 def sigma(x):
     """helper function for Elo calculation"""
     return 1 / (1 + np.exp(-x))
 
+def pr_prob_i_beats_j(i_rating, j_rating):
+    """Sigmoid of the scaled ratings difference to help update Elo."""
+    alpha = np.log(10) / 400
+    return sigma(alpha * (i_rating - j_rating))
+
 def elo_gradient_descent(wr_dict, n=5000):
     """calculates Elo ratings for each item in a simulated tournament
-       where each player plays against the others."""
-    alpha = np.log(10) / 400
+       where each player plays against the others. Using probability of winning
+       should be equivalent to drawing a random ranking."""
     items = set()
     elo_dict = {}
     for k in wr_dict.keys():
-        items += {k[0], k[1]}
-        elo_dict[k[0]] = 
-
+        items = items.union({k[0], k[1]})
+        elo_dict[k[0]] = 1000
+    items_tup = tuple(items)
+    K = 40 # temporary constant updating rate
+    for i in range(n):
+        if i > n//2:
+            K = 20
+        if i > (3 * n//4):
+            K = 10
+        matched_pair = tuple(np.random.choice(items_tup, 2, replace=False))
+        i_item, j_item = matched_pair
+        i_rating, j_rating = elo_dict[i_item], elo_dict[j_item]
+        estimated_pr_i_wins = pr_prob_i_beats_j(i_rating, j_rating)
+        estimated_pr_j_wins = 1 - estimated_pr_i_wins
+        i_outcome = int(np.random.random() < wr_dict[matched_pair])
+        j_outcome = 1 - i_outcome
+        elo_dict[i_item] = i_rating + K * (i_outcome - estimated_pr_i_wins)
+        elo_dict[j_item] = j_rating + K * (j_outcome - estimated_pr_j_wins)
+    print("items: ", items)
+    print("Elo dict:", elo_dict)
+    print(sum(elo_dict.values()))
+    return elo_dict
                 
 #def main():
 
