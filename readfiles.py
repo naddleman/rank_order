@@ -2,6 +2,7 @@ import os
 import numpy as np
 import pandas as pd
 from collections import defaultdict
+from math import factorial
 
 """.xls files are 8 cols by n ~= 100 rows.
     first col is just ['', 'RR', '', '', ...] and each other col is the ranking
@@ -105,6 +106,41 @@ def elo_gradient_descent(wr_dict, n=5000):
     print("Elo dict:", elo_dict)
     print(sum(elo_dict.values()))
     return elo_dict
+
+def sample_permutations_from_df(df):
+    """Takes two random rows from the dataframe and returns lists representing
+       the participant's ranking, e.g., [3, 5, 1, 7, 2, 4, 6]."""
+    df_rows = df.sample(2)
+    return df_rows.iloc[0], df_rows.iloc[1]
+
+def kt_distance(perm0, perm1, normalized=False):
+    """Counts the number of pairwise disagreements between rankings.
+       This implementation is probably not the best."""
+    length = len(perm0)
+    assert len(perm0) == len(perm1)
+    rename = dict(zip(perm0, range(1, length + 1)))
+    renamed_p1 = list(map(lambda x: rename[x], perm1))
+    distance = 0
+    for j in range(1, length):
+        for i in range(j):
+            if renamed_p1[i] > renamed_p1[j]:
+                distance += 1
+    if not normalized:
+        return distance
+    else:
+        return distance / (length * (length - 1) / 2)
+
+# SciPy has kendall tau. Implement bubble sort distance instead?
+#def kendall_tau(ordering_1, ordering_2):
+#    """A naive implementation O(n^2) of Kendall's tau as a distance between
+#       permutations (rankings. Each list must have the same elements"""
+#    assert set(ordering_1) == set(ordering_2)
+#    count = len(ordering_1)
+#    denominator = factorial(count) // factorial(2) // factorial(count - 2)
+#    numerator = 0
+#    for i in range(2, 
+
+    
                 
 #def main():
 
