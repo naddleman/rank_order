@@ -1,8 +1,10 @@
 import os
+import itertools
 import numpy as np
 import pandas as pd
 from collections import defaultdict
 from math import factorial
+
 
 """.xls files are 8 cols by n ~= 100 rows.
     first col is just ['', 'RR', '', '', ...] and each other col is the ranking
@@ -31,7 +33,11 @@ def concatenate_excel_sheets(file_list, columns=7):
     for file_name in file_list:
         dfs.append(pd.read_excel(os.path.join('data', file_name),
                                  usecols=range(1, columns + 1)))
-    return pd.concat(dfs)
+    return pd.concat(dfs, ignore_index=True)
+
+def remove_faulty_rows(df, n):
+    """Drop rows from df if the subject failed to enter unique values"""
+    return df.drop(df.loc[df.sum(axis=1) != sum(range(1, n + 1))].index)
 
 def pairwise_winrates(df):
     """Generates an n-by-n matrix of probabilities that <row> is ranked higher
@@ -130,6 +136,82 @@ def kt_distance(perm0, perm1, normalized=False):
     else:
         return distance / (length * (length - 1) / 2)
 
+def generate_distances_dict(n, metric=kt_distance):
+    """Produces a dictionary storing all pairwise distances between points in
+       permutation space (kt_distance). Too slow!"""
+    distance_dict = {}
+    sequence = range(1, n + 1)
+    permuted = itertools.permutations(sequence)
+    for pair in itertools.combinations(permuted, 2):
+        f, s = pair
+        distance_dict[pair] = metric(f, s)
+    return distance_dict
+
+def data_distances(df, metric=kt_distance):
+    """Produces a dictionary storing all pairwise distances between data points
+       from a dataframe of numerical rankings: elements in (1, .., n)
+
+       uses kt_distance only, for now."""
+    distance_dict = {}
+    data_pairs = itertools.combinations(df.values, 2)
+    for f, s in data_pairs:
+        distance_dict[(tuple(f), tuple(s))] = metric(f, s)
+    return distance_dict
+
+def asymmetric_distance(p1, p2, distance_dict):
+    """Since distance dict has key (A, B) but not (B, A) we will look up
+       the swapped pair. Return 0 if p1 == p2"""
+    if np.all(p1 == p2):
+        return 0
+    try:
+        return distance_dict[(p1, p2)]
+    except KeyError:
+        return distance_dict[(p2, p1)]
+
+def k_medoids(df, medoid_count=2, metric=kt_distance, max_iter=1000):
+    """k-medoids clustering joins points to the closest mediod (like a median,
+       but it must be a datapoint, not just a point in the ambient space.
+
+       This is the naive implementation:
+           1. Select n data points as initial medoids
+           2. assign each data point to the closest medoid
+           3. Determine a new medoid for each cluster
+           4. Repeat (from 2) until the medoids do not change"""
+    distances = data_distances(df, metric=metric)
+    maxd = max(distances.values())
+    medoids = list(map(tuple,df.sample(medoid_count).values))
+    loss = maxd * len(df)
+    #assignment step
+    for iteration in range(max_iter):
+        assignments = {0:[], 1:[]}
+        old_medoids = medoids.copy()
+        print("old medoids:", old_medoids)
+        for permutation in map(tuple,df.values):
+            d0, d1 = map(lambda x: asymmetric_distance(x, permutation, distances),
+                         medoids)
+            if d0 <= d1:
+                assignments[0].append(permutation)
+            else:
+                assignments[1].append(permutation)
+        # determine new medoids
+        for cluster in range(medoid_count):
+            min_so_far = sum([asymmetric_distance(medoids[cluster], p1, distances)
+                               for p1 in assignments[cluster]])
+            for i, p0 in enumerate(assignments[cluster]):
+                total = sum([asymmetric_distance(p0, p1, distances)
+                                for p1 in assignments[cluster]])
+                if total < min_so_far:
+                    min_so_far = total
+                    medoids[cluster] = p0
+        print("new medoids:", medoids)
+        if np.all(old_medoids == medoids):
+            print("converged in " + str(iteration + 1) + " iterations.")
+            break
+    return assignments, medoids
+
+
+
+
 # SciPy has kendall tau. Implement bubble sort distance instead?
 #def kendall_tau(ordering_1, ordering_2):
 #    """A naive implementation O(n^2) of Kendall's tau as a distance between
@@ -148,5 +230,6 @@ def kt_distance(perm0, perm1, normalized=False):
 if __name__ == '__main__':
     lis = valid_sin_xls_sheets()
     df = concatenate_excel_sheets(lis)
+    df = remove_faulty_rows(df, 7)
     pairs = pairwise_winrates(df)
 
