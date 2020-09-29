@@ -30,22 +30,27 @@ def concatenate_excel_sheets(file_list, columns=7):
     """Produces a single df with all the rank order data from many excel
        spreadsheets. The first column is assumed to be irrelevant"""
     dfs = []
+    dfs_with_filename = []
     for file_name in file_list:
-        dfs.append(pd.read_excel(os.path.join('data', file_name),
-                                 usecols=range(1, columns + 1)))
-    return pd.concat(dfs, ignore_index=True)
+        excel_file = pd.read_excel(os.path.join('data', file_name),
+                                    usecols=range(1, columns + 1))
+        excel_file['filename'] = os.path.basename(file_name)
+        dfs_with_filename.append(excel_file)
+    stacked_fn = pd.concat(dfs_with_filename, ignore_index=True)
+    return stacked_fn.drop('filename', axis=1), stacked_fn
 
 def remove_faulty_rows(df, n):
     """Drop rows from df if the subject failed to enter unique values"""
-    return df.drop(df.loc[df.sum(axis=1) != sum(range(1, n + 1))].index)
+    return df.drop(df.loc[df.iloc[:, :7].sum(axis=1) != sum(range(1, n + 1))].index)
+    #return df.drop(df.loc[df.sum(axis=1) != sum(range(1, n + 1))].index)
 
-def pairwise_winrates(df):
+def pairwise_winrates(df, data_columns=7):
     """Generates an n-by-n matrix of probabilities that <row> is ranked higher
        than <column> by a player in the dataframe of rank orders"""
     winrates = dict()
     nrows = df.shape[0]
-    for col_1 in df.columns:
-        for col_2 in df.columns:
+    for col_1 in df.columns[:data_columns]:
+        for col_2 in df.columns[:data_columns]:
             if col_1 == col_2:
                 winrates[(col_1, col_1)] = 0.5
             else:
@@ -183,16 +188,15 @@ def k_medoids(df, medoid_count=2, metric=kt_distance, max_iter=1000):
     loss = maxd * len(df)
     #assignment step
     for iteration in range(max_iter):
-        assignments = {0:[], 1:[]}
+        assignments = defaultdict(list)
         old_medoids = medoids.copy()
         print("old medoids:", old_medoids)
         for permutation in map(tuple,df.values):
-            d0, d1 = map(lambda x: asymmetric_distance(x, permutation, distances),
-                         medoids)
-            if d0 <= d1:
-                assignments[0].append(permutation)
-            else:
-                assignments[1].append(permutation)
+            ds = [asymmetric_distance(x, permutation, distances)
+                    for x in medoids]
+            for i, d in enumerate(ds):
+                if d == min(ds):
+                    assignments[i].append(permutation)
         # determine new medoids
         for cluster in range(medoid_count):
             min_so_far = sum([asymmetric_distance(medoids[cluster], p1, distances)
@@ -209,8 +213,41 @@ def k_medoids(df, medoid_count=2, metric=kt_distance, max_iter=1000):
             break
     return assignments, medoids
 
+def reverse_assignments(assignments):
+    """reverses a dict: {k1: [v1, v2, ..]
+                         k2: [v3, v4, ..]} ->
+                        {v1: k1, v2: k1, v3: k2, v4: k2 ...}"""
+    keys = assignments.keys()
+    out_dict = {}
+    for key in keys:
+        for val in assignments[key]:
+            out_dict[val] = key
+    return out_dict
+
+def insert_cluster_column(df, cluster_dict):
+    """cluster_dict should be a dict of tuples -> cluster number
+       maps a row to it's associated cluster and adds that column to df."""
+    numerical_rows = len(list(cluster_dict.keys())[0])
+    df['tuple'] = df.iloc[:, :numerical_rows].apply(tuple, axis=1)
+    df['cluster'] = df['tuple'].apply(lambda x: cluster_dict[x])
+    return df
+
+def print_cluster_distributions(df_fn, label='filename'):
+    """prints the distributions of rows with each unique label belonging to
+       clusters"""
+    labels = df_fn[label].unique()
+    num_clusters = len(df_fn['cluster'].unique())
+    for lab in labels:
+        counts = df_fn.loc[df_fn[label] == lab]['cluster'].value_counts()
+        print(lab)
+        for i in range(num_clusters):
+            print("Cluster", i, ":", counts[i])
 
 
+#def rankings_to_file_dict(df):
+#    """takes the dataframe with the 'filename' column and produces a map from
+#       ranking (row) to filename"""
+#    for row in rankings_to
 
 # SciPy has kendall tau. Implement bubble sort distance instead?
 #def kendall_tau(ordering_1, ordering_2):
@@ -229,7 +266,12 @@ def k_medoids(df, medoid_count=2, metric=kt_distance, max_iter=1000):
 
 if __name__ == '__main__':
     lis = valid_sin_xls_sheets()
-    df = concatenate_excel_sheets(lis)
+    df, df_fn = concatenate_excel_sheets(lis)
     df = remove_faulty_rows(df, 7)
+    df_fn = remove_faulty_rows(df_fn, 7)
     pairs = pairwise_winrates(df)
+    assignments, meds = k_medoids(df)
+    clusters = reverse_assignments(assignments)
+    df_fn = insert_cluster_column(df_fn, clusters)
+
 
