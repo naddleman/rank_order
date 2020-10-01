@@ -7,3 +7,4 @@ ipython_config.py
 env/
 venv/
 ENV/
+*.md
