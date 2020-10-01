@@ -9,7 +9,15 @@
 """
 
 import os
+<<<<<<< HEAD
 import pandas as pd
+=======
+import itertools
+import numpy as np
+import pandas as pd
+from collections import defaultdict
+from math import factorial
+>>>>>>> 970f02bd3eeb38ea2d55b88ab9fc8deabc06415d
 import rankings
 
 # PC_100_rank_time.xls does not have a header identifying sins and has 8 cols
