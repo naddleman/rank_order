@@ -194,5 +194,20 @@ def insert_cluster_column(df, cluster_dict):
     df['cluster'] = df['tuple'].apply(lambda x: cluster_dict[x])
     return df
 
-
-
+def gram_matrix_from_df(df, 
+                        normalized=False,
+                        columns=['Lust', 
+                                 'Envy', 
+                                 'Greed', 
+                                 'Sloth', 
+                                 'Wrath', 
+                                 'Pride', 
+                                 'Gluttony']):
+    rows = df.shape[0]
+    matrix = np.zeros((rows, rows))
+    for i in range(rows):
+        v1 = df.iloc[i]
+        for j in range(rows):
+            v2 = df.iloc[j]
+            matrix[i,j] = kt_distance(v1, v2)
+    return matrix

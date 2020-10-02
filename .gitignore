@@ -8,3 +8,6 @@ env/
 venv/
 ENV/
 *.md
+*.txt
+*.npy
+*.csv
