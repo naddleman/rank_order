@@ -11,3 +11,4 @@ ENV/
 *.txt
 *.npy
 *.csv
+data/
